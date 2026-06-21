@@ -20,6 +20,14 @@ export function TaskItem({ task, users, onChanged }: Props) {
   const currentIndex = STATUS_ORDER.indexOf(task.status);
   const nextStatus = STATUS_ORDER[currentIndex + 1];
 
+  // Fetches the latest audit log for this task. Shared by the "View History"
+  // toggle and by handleAdvance() so a status change can refresh the history
+  // in place instead of waiting for the user to re-open the panel.
+  async function loadLogs() {
+    const data = await api.fetchAuditLogs(task.id);
+    setLogs(data);
+  }
+
   async function handleAdvance() {
     if (!actor) {
       setError("Select an actor before changing status");
@@ -31,6 +39,10 @@ export function TaskItem({ task, users, onChanged }: Props) {
       setError(null);
       await api.updateTaskStatus(task.id, nextStatus, actor);
       onChanged();
+      // Show the new entry right away: refresh the log and open the history
+      // panel so the change is visible immediately, not after a manual click.
+      await loadLogs();
+      setShowHistory(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update status");
     } finally {
@@ -60,8 +72,7 @@ export function TaskItem({ task, users, onChanged }: Props) {
     try {
       setLogsLoading(true);
       setError(null);
-      const data = await api.fetchAuditLogs(task.id);
-      setLogs(data);
+      await loadLogs();
       setShowHistory(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load history");
