@@ -56,6 +56,15 @@ class InMemoryStore {
       .filter((log) => log.taskId === taskId)
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }
+
+  // All logs across every task (including tasks that have since been deleted),
+  // sorted chronologically. Still read-only - there is deliberately no method
+  // that mutates or removes an existing log.
+  getAllAuditLogs(): AuditLog[] {
+    return [...this.auditLogs].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    );
+  }
 }
 
 // Single shared instance for the lifetime of the process.

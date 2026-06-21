@@ -52,6 +52,10 @@ export function getTaskAuditLogs(req: Request, res: Response) {
   res.json({ data: auditLogService.getAuditLogsForTask(req.params.id) });
 }
 
+export function getAllAuditLogs(_req: Request, res: Response) {
+  res.json({ data: auditLogService.getAllAuditLogs() });
+}
+
 function handleError(err: unknown, res: Response) {
   if (err instanceof NotFoundError) {
     return res.status(404).json({ error: err.message });

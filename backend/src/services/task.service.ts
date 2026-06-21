@@ -44,8 +44,6 @@ export function deleteTask(id: string): void {
     throw new NotFoundError(`Task ${id} not found`);
   }
   store.deleteTask(id);
-  // Audit logs for this task are intentionally NOT deleted here.
-  // See README "Assumptions" for the reasoning.
 }
 
 export interface StatusUpdateResult {
@@ -65,8 +63,6 @@ export function updateTaskStatus(id: string, actor: string, newStatus: TaskStatu
     );
   }
 
-  // Idempotency: setting the same status is a successful no-op and
-  // must NOT create a new audit log entry.
   if (task.status === newStatus) {
     return { task, logCreated: false };
   }
@@ -85,7 +81,7 @@ export function updateTaskStatus(id: string, actor: string, newStatus: TaskStatu
     updatedAt: new Date().toISOString(),
   };
   store.updateTask(updatedTask);
-  recordStatusChange(id, actor, previousStatus, newStatus);
+  recordStatusChange(id, task.title, actor, previousStatus, newStatus);
 
   return { task: updatedTask, logCreated: true };
 }

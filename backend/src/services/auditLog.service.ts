@@ -10,6 +10,7 @@ import { AuditLog, TaskStatus } from "../types";
  */
 export function recordStatusChange(
   taskId: string,
+  taskTitle: string,
   actor: string,
   fromStatus: TaskStatus,
   toStatus: TaskStatus,
@@ -17,6 +18,7 @@ export function recordStatusChange(
   const log: AuditLog = {
     id: crypto.randomUUID(),
     taskId,
+    taskTitle,
     actor,
     fromStatus,
     toStatus,
@@ -27,4 +29,10 @@ export function recordStatusChange(
 
 export function getAuditLogsForTask(taskId: string): AuditLog[] {
   return store.getAuditLogsByTaskId(taskId);
+}
+
+// All logs across every task, including tasks that have been deleted.
+// Backs the global "Semua Audit Log" view in the frontend.
+export function getAllAuditLogs(): AuditLog[] {
+  return store.getAllAuditLogs();
 }

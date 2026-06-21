@@ -1,15 +1,14 @@
 # Mini Task Manager
 
-A small internal tool for creating tasks, moving them through a fixed status workflow, and reviewing
-a tamper-proof audit trail of every status change, built for the "Full Stack Developer (React +
-Express)" take-home assessment.
+Aplikasi kecil untuk tim internal: membuat task, memindahkan status task lewat alur yang sudah
+ditentukan, dan melihat riwayat (audit log) dari setiap perubahan status yang tidak bisa diubah-ubah.
 
-## Tech stack
+## Teknologi
 
-- **Backend:** Node.js + Express + TypeScript, in-memory data store
+- **Backend:** Node.js + Express + TypeScript, penyimpanan di memory
 - **Frontend:** React + TypeScript (Vite)
 
-## How to run
+## Cara menjalankan
 
 ### 1. Backend
 
@@ -19,11 +18,11 @@ npm install
 npm run dev
 ```
 
-Starts the API on `http://localhost:4000` (override with a `PORT` env var).
+API jalan di `http://localhost:4000`.
 
 ### 2. Frontend
 
-In a separate terminal:
+Buka terminal baru:
 
 ```bash
 cd frontend
@@ -31,153 +30,136 @@ npm install
 npm run dev
 ```
 
-Starts the app on `http://localhost:5173` and talks to the backend at `http://localhost:4000` by
-default. To point it elsewhere, copy `frontend/.env.example` to `frontend/.env` and set
-`VITE_API_BASE_URL`.
+Aplikasi jalan di `http://localhost:5173` dan otomatis terhubung ke backend di `http://localhost:4000`.
 
-### API summary
+### Daftar API
 
-| Method | Route                      | Purpose                                  |
+| Method | Route                      | Fungsi                                    |
 |--------|-----------------------------|-------------------------------------------|
-| GET    | `/users`                    | Predefined actor list (for the dropdown) |
-| GET    | `/tasks`                    | List all tasks                           |
-| POST   | `/tasks`                    | Create a task (`title`, optional `description`) |
-| DELETE | `/tasks/:id`                 | Delete a task                            |
-| PUT    | `/tasks/:id/status`          | Change status (`status`, `actor`)        |
-| GET    | `/tasks/:id/audit-logs`      | Chronological audit log for one task     |
+| GET    | `/users`                    | Daftar actor (dropdown) |
+| GET    | `/tasks`                    | Menampilkan semua task                    |
+| POST   | `/tasks`                    | Membuat task (`title`, `description` opsional) |
+| DELETE | `/tasks/:id`                 | Menghapus task                            |
+| PUT    | `/tasks/:id/status`          | Mengubah status (`status`, `actor`)       |
+| GET    | `/tasks/:id/audit-logs`      | Riwayat perubahan satu task (urut waktu)  |
+| GET    | `/audit-logs`               | Riwayat semua task (termasuk yang sudah dihapus) |
 
-## Architecture
+## Arsitektur
 
 ```
 backend/src/
-  routes/        -> HTTP routes only, no logic
-  controllers/    -> request/response handling + input shape checks
-  services/       -> domain logic (status transition rules, idempotency, audit recording)
-  data/store.ts    -> in-memory persistence, the only place data is actually stored
-  types/          -> shared domain types (Task, AuditLog, status order, predefined users)
+  routes/        -> menentukan route HTTP
+  controllers/    -> menangani request dan validasi input
+  services/       -> logika inti (ngatur urutan status, unrepeatable, catat audit)
+  data/store.ts    -> penyimpanan di memory (hilang saat dirun ulang)
+  types/          -> tipe data bersama (Task, AuditLog, urutan status(hardcoded), daftar user (hardcoded))
 
 frontend/src/
-  api/client.ts    -> all fetch() calls to the backend, one place per concern
-  components/      -> CreateTaskForm, TaskItem (status + delete + history), StatusBadge
-  types/           -> mirrors backend/src/types so both sides agree on the data shape
+  api/client.ts    -> semua pemanggilan fetch() ke backend
+  components/      -> CreateTaskForm, TaskItem (actor + status + hapus + riwayat), GlobalAuditLog, StatusBadge
+  types/           -> menyalin backend/src/types supaya bentuk data kedua sisi sama
 ```
 
-The backend is layered (routes → controllers → services → store) specifically so the status-transition
-and audit-log rules live in one place (`task.service.ts`) and can't be bypassed by adding a new route.
+Backend dibuat berlapis (routes → controllers → services → store) supaya aturan perpindahan status dan
+audit log berada di satu tempat (`task.service.ts`) dan tidak bisa dilewati hanya dengan menambah route
+baru.
 
-A key design decision: **`store.ts` never exposes an "update" or "delete" function for audit logs** —
-only `appendAuditLog()` and `getAuditLogsByTaskId()` exist. That's the actual mechanism that guarantees
-logs can't be modified, not just a rule written in a comment.
+Keputusan penting: **`store.ts` tidak punya fungsi "update" atau "delete" untuk audit log** — yang ada
+hanya `appendAuditLog()` (tambah) dan `getAuditLogsByTaskId()` (baca). Inilah yang benar-benar menjamin
+log tidak bisa diubah, bukan sekadar aturan di komentar.
 
-## Assumptions
+## Asumsi yang diambil
 
-1. **"hanya mengikuti urutan: to_do → pending → in_progress → done"** is interpreted strictly: a task
-   may only advance to the *immediate next* status, one step at a time. No skipping ahead (e.g.
-   `to_do → done`), no moving backward. This keeps the rule simple and easy to verify, and is reflected
-   directly in `isValidTransition()`.
-2. **Idempotent update** (`PUT .../status` with the task's current status) returns `200 OK` with the
-   unchanged task and `logCreated: false` — treated as a successful no-op, not an error.
-3. **Deleting a task does not delete its audit logs.** The brief says logs must never be modified or
-   deleted "dalam keadaan apapun" (under any circumstance) — read literally, that includes after the
-   parent task is gone. `GET /tasks/:id/audit-logs` still returns history for a deleted task's id.
-4. **Actor is a closed, hardcoded list** of 4 example usernames (not free text), served from the backend
-   via `GET /users` so the frontend dropdown and the backend's server-side validation share one source
-   of truth instead of two hardcoded lists that could drift apart.
-5. **No authentication.** Per the "No Overengineering" note, anyone using the UI can act as any of the
-   4 predefined actors. Flagged explicitly as a risk in the questions below, not silently ignored.
+1. **"hanya mengikuti urutan: to_do → pending → in_progress → done"**. Task hanya
+   boleh maju ke status berikutnya, satu langkah saja. Tidak boleh lompat (misal `to_do → done`), tidak
+   boleh mundur. Aturan ini ditulis langsung di `isValidTransition()`.
+2. **Update idempotent** (`PUT .../status` dengan status yang sama dengan status sekarang) mengembalikan
+   `200 OK` dengan task yang tidak berubah dan `logCreated: false`, dianggap berhasil tapi tidak
+   melakukan apa-apa, bukan error.
+3. **Menghapus task tidak menghapus audit log-nya.** Tertulis log tidak boleh diubah/dihapus "dalam
+   keadaan apapun", kalau dibaca apa adanya, termasuk setelah task induknya hilang. Jadi
+   `GET /tasks/:id/audit-logs` tetap mengembalikan riwayat meski task-nya sudah dihapus. Supaya log task
+   yang sudah dihapus tetap bisa dilihat dari UI (bukan cuma lewat API), ada section **"Semua Audit Log"**
+   di bawah halaman yang menampilkan riwayat semua task, termasuk task yang telah dihapus.
+4. **Actor adalah daftar tertutup** berisi 4 contoh nama (bukan ketik bebas), dikirim dari backend
+   lewat `GET /users` supaya dropdown di frontend dan validasi di backend memakai satu sumber yang sama.
+5. **Tanpa login/auth.** Sesuai catatan "No Overengineering".
 
-## Trade-offs
+## Trade-off yang dibuat
 
-- **In-memory store, not a real database.** Fastest to set up and review with zero external
-  dependencies, but data is lost on every restart and there's no real concurrency safety. This is the
-  top candidate for refactoring (see below) the moment this becomes more than a take-home.
-- **Frontend uses a single "Advance to `<next status>`" button instead of a free status dropdown.**
-  Since only one forward transition is ever valid at a time, a free dropdown would mostly just create
-  more ways to trigger a 400 for no real UX benefit. The backend still independently re-validates every
-  transition regardless of what the frontend sends — the frontend constraint is a convenience, not the
-  source of truth.
-- **Audit history is an inline expandable section per task**, not a separate page, to keep the app to
-  one screen and avoid adding client-side routing for a 3–5 hour scope.
-- **No automated tests**, given the time box — verified manually instead (see below). Called out as a
-  known gap rather than an oversight.
+- **Disimpan di memory, bukan database asli.** Paling cepat disiapkan dan dibaca, tanpa setup tambahan.
+  Minusnya data hilang setiap server restart, dan belum ada pengamanan untuk akses bersamaan.
+- **Frontend pakai satu tombol "Advance to `<status berikutnya>`", bukan dropdown status bebas.** Karena
+  hanya ada satu perpindahan yang valid setiap saat, dropdown bebas malah memperbanyak cara memicu error
+  400 tanpa manfaat nyata. Backend tetap memvalidasi ulang setiap perpindahan, apa pun yang dikirim
+  frontend, batasan di frontend hanya kemudahan, bukan sumber kebenaran.
+- **Riwayat audit ditampilkan sebagai bagian yang bisa dibuka di tiap task**, bukan halaman terpisah,
+  supaya aplikasi cukup satu layar dan tidak perlu menambah routing.
+- **Audit log diperbarui dengan cara fetch ulang (refetch) setelah status berubah**
+  Lebih sederhana dan sudah cukup untuk tampilan satu layar. Backend tetap jadi sumber kebenaran log.
 
-## Manual testing performed
+## Pengujian manual yang sudah dilakukan menggunakan Postman
 
-- Create task → starts at `to_do`.
-- Valid forward transitions (`to_do → pending → in_progress → done`) each create exactly one audit log
-  entry, in order.
-- Re-submitting the same status returns `200` with `logCreated: false` and no new log row.
-- Skipping a step (e.g. `pending → done`) and submitting an unrecognized actor both return `400` with a
-  descriptive error.
-- Deleting a task removes it from `GET /tasks` but its `GET /tasks/:id/audit-logs` history still returns
-  the original entries.
+- Membuat task → mulai dari status `to_do`.
+- Perpindahan maju yang valid (`to_do → pending → in_progress → done`) masing-masing membuat tepat satu
+  audit log, berurutan.
+- Mengirim status yang sama lagi mengembalikan `200` dengan `logCreated: false` dan tidak menambah log.
+- Melompati langkah/melangkah kembali dan mengirim actor yang tidak dikenal sama-sama
+  mengembalikan `400` dengan error message yang jelas.
+- Menghapus task menghilangkannya dari `GET /tasks`, tapi `GET /tasks/:id/audit-logs` dan
+  `GET /audit-logs` tetap mengembalikan riwayat aslinya, lengkap dengan `taskTitle`.
+- Setelah menekan "Advance", riwayat audit langsung tampil/diperbarui di layar tanpa perlu menekan
+  tombol "View History" lagi. (bukan Postman, tapi UI)
+- Section "Semua Audit Log" menampilkan riwayat lintas task; log milik task yang sudah dihapus tetap
+  muncul dan ditandai "(task dihapus)" di UI.
 
-## What I'd improve with more time
+## Yang akan diperbaiki kalau ada waktu lebih
 
-- Automated tests: unit tests for `task.service` (transition rules, idempotency) and integration tests
-  for the API routes.
-- Swap the in-memory store for a real database (e.g. SQLite/Postgres via Prisma), wrapping
-  "validate transition + write status + write audit log" in a single DB transaction — this removes the
-  race condition described below, not just the persistence problem.
-- Real authentication, so `actor` comes from a session instead of a self-reported dropdown.
-- Pagination/filtering on `GET /tasks` and `GET /tasks/:id/audit-logs` for when either list grows large.
-- Optimistic UI updates and nicer inline validation states on the frontend.
+- Automated test: unit test untuk `task.service` (aturan perpindahan, idempotency) dan integration test
+  untuk route API.
+- Mengganti penyimpanan memory dengan database asli (misal SQLite), lalu membungkus "validasi perpindahan + tulis status + tulis audit log" dalam satu baris database, untuk menghilangkan race condition.
+- Login/auth asli, supaya `actor` berasal dari sesi login, bukan dipilih sendiri dari dropdown.
+- Pagination/filter atau Skeleton loader untuk `GET /tasks` dan `GET /tasks/:id/audit-logs` saat datanya sudah banyak.
+- Update UI yang lebih halus (optimistic update) dan tampilan validasi inline yang lebih rapi.
 
-## Answers
+## Jawaban pertanyaan
 
 **Bagaimana kamu memastikan audit log tidak ter-modifikasi?**
 
-At the code level, there is no function anywhere in the codebase that updates or deletes an audit log
-row. `store.ts` only exposes `appendAuditLog()` and `getAuditLogsByTaskId()` — there's no
-`updateAuditLog()` or `deleteAuditLog()` to call, by anyone. No route accepts `PUT`/`PATCH`/`DELETE` on
-`/audit-logs`, and there's no route that lets a client create a log directly either — logs are only ever
-written as a side effect inside `updateTaskStatus()`, immediately after a transition passes validation.
-In a real system backed by an actual database, I'd reinforce this further with an insert-only DB
-permission on the audit table, or move to a proper append-only event log if the audit trail became a
-core business asset rather than a side feature.
+Di level kode, tidak ada satu pun fungsi yang bisa mengubah atau menghapus baris audit log. `store.ts`
+hanya menyediakan `appendAuditLog()` (tambah) dan `getAuditLogsByTaskId()` (baca). Tidak ada route yang menerima `PUT`/`PATCH`/`DELETE` ke `/audit-logs`, dan tidak ada route yang membiarkan client membuat log langsung
+— log hanya ditulis sebagai efek samping di dalam `updateTaskStatus()`, tepat setelah perpindahan lolos
+validasi.
 
 **Bagian mana dari solusi ini yang paling berisiko jika digunakan oleh banyak user?**
 
-The status-update flow has a check-then-act race condition: reading the current status, validating the
-transition, and writing the new status + audit log are not atomic. Two near-simultaneous requests for
-the same task could both read the same "current status," both pass validation, and both write — leaving
-two audit entries and a final state that doesn't clearly reflect which write actually won. With one
-in-memory Node process this is unlikely to surface in the scope of this take-home, but it would become a
-real problem under genuine concurrent load or once the app runs as more than one instance. The second
-biggest risk is the lack of authentication — since `actor` is self-reported from a dropdown, the audit
-trail can't actually be trusted as a real accountability record yet.
+Alur update status punya race condition jenis "cek lalu tulis": membaca status sekarang, memvalidasi
+perpindahan, lalu menulis status baru dan audit log itu tidak atomic (bukan satu langkah utuh). Dua
+request yang datang hampir bersamaan untuk task yang sama bisa sama-sama membaca status yang sama,
+sama-sama lolos validasi, dan sama-sama menulis, menghasilkan dua audit log dan status akhir yang tidak
+jelas siapa yang "menang". Dengan satu proses Node di memory hal ini jarang muncul di lingkup take-home,
+tapi akan jadi masalah nyata saat beban benar-benar bersamaan atau aplikasi jalan di lebih dari satu
+instance. Risiko terbesar kedua adalah tidak adanya login, karena `actor` dipilih sendiri dari
+dropdown, audit trail belum bisa benar-benar dipercaya sebagai catatan pertanggungjawaban.
 
 **Jika task ini berkembang menjadi sistem besar, bagian mana yang akan kamu refactor terlebih dahulu dan
 kenapa?**
 
-The persistence layer first. Moving from the in-memory store to a real database with transactional
-writes fixes both the data-loss-on-restart problem and the race condition above in a single change, by
-wrapping "validate transition → update task → insert audit log" in one DB transaction. Authentication
-would be next, since `actor` is the entire point of the audit feature — a self-reported dropdown
-undermines that the moment more than one person shares the same browser. After that, I'd consider
-splitting the audit log into its own read-optimized store if log volume grew large, since audit data is
-written far more often than it's read, but needs to support filtering/search whenever it is read.
+Lapisan penyimpanannya dulu. Pindah dari penyimpanan memory ke database asli dengan penulisan
+transaksional sekaligus menyelesaikan dua masalah yaitu data hilang saat restart, dan
+race condition seperti yang aku jelaskan sebleumya. Caranya dengan membungkus "validasi perpindahan → update task → insert audit log" dalam satu transaksi database. Berikutnya, menerapkan authentikasi, karena `actor` adalah inti dari fitur audit. Setelah itu, apabila jumlah log sudah sangat banyak, saya akan mempertimbangkan memisahkan audit log ke penyimpanan tersendiri yang dioptimalkan untuk dibaca, karena data audit lebih sering ditulis daripada dibaca, tapi tetap perlu mendukung filter atau pencarian saat audit log dibaca.
 
-## AI usage disclosure
+## Keterangan penggunaan AI
 
-I used an AI assistant (Claude) as a pair-programming aid while building this project. Concretely:
+Saya memakai AI (Claude) sebagai teman ngoding selama membuat proyek ini. Detailnya:
 
-- **Scaffolding and boilerplate** — the initial layered backend structure (routes/controllers/services/store),
-  the Vite + React setup, and the CSS were drafted with AI help, then reviewed and adjusted by me.
-- **Core domain logic** — `isValidTransition()`, the idempotency check and `logCreated` flag in
-  `updateTaskStatus()`, and the deliberately append-only `store.ts` (no update/delete for audit logs)
-  were designed together; I made sure I understood *why* each rule lives where it does rather than
-  accepting it blindly.
-- **README reasoning** — the assumptions, trade-offs, and the three reflection answers were written
-  collaboratively and edited to match the choices actually made in the code.
+- **Kerangka dan kode dasar** — struktur backend berlapis (routes/controllers/services/store), setup
+  Vite + React, dan CSS dibuat dengan bantuan AI, lalu saya periksa dan sesuaikan sendiri.
+- **Logika inti** — `isValidTransition()`, pengecekan idempotency dan flag `logCreated` di
+  `updateTaskStatus()`, serta `store.ts` yang sengaja append-only (tanpa update/delete untuk audit log)
+  dirancang bersama; saya pastikan paham *kenapa* tiap aturan ada di situ, bukan asal terima.
+- **Penjelasan di README** — asumsi, trade-off, dan tiga jawaban refleksi ditulis bersama lalu saya edit
+  agar sesuai dengan keputusan yang benar-benar ada di kode.
 
-**How I validated it:** I read through every file — especially `task.service.ts` and `store.ts`, where
-the transition/idempotency/immutability rules live — and ran the API manually with `curl` to confirm the
-behaviour claimed in "Manual testing performed": a valid advance creates exactly one log, re-sending the
-same status returns `logCreated: false` with no new log, skipping a step or sending an unknown actor
-returns `400`, audit logs come back in chronological order, and there is no route that can modify or
-delete a log (`DELETE /tasks/:id/audit-logs` → `404`). Both `backend` and `frontend` also pass
-`tsc --noEmit` with no errors. I can explain any line in this repo on request.
-
-> _Note for the candidate: please skim this paragraph and tweak it so it matches your own workflow
-> honestly before submitting — the interviewer will expect you to back up whatever it claims._
+**Cara saya memastikan benar:** saya membaca setiap file dan menjalankan API secara manual dengan
+pengujian menggunakan Postman untuk membuktikan perilaku di "Pengujian manual": perpindahan valid membuat tepat satu log, mengirim status yang sama mengembalikan `logCreated: false` tanpa log baru, melompati langkah/melangkah kembali atau actor tak dikenal mengembalikan `400`, audit log keluar urut waktu, dan tidak ada route yang bisa mengubah atau menghapus log (`DELETE /tasks/:id/audit-logs` → `404`). `backend` dan `frontend` juga lolos `tsc --noEmit` tanpa error.

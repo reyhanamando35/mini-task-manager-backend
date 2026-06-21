@@ -3,12 +3,15 @@ import { Task } from "./types";
 import * as api from "./api/client";
 import { CreateTaskForm } from "./components/CreateTaskForm";
 import { TaskItem } from "./components/TaskItem";
+import { GlobalAuditLog } from "./components/GlobalAuditLog";
 
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Bumped on every change so the global audit log refetches in sync.
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const loadTasks = useCallback(async () => {
     try {
@@ -19,6 +22,13 @@ export default function App() {
       setError(err instanceof Error ? err.message : "Failed to load tasks");
     }
   }, []);
+
+  // Called after any task create/status-change/delete: refresh the task list
+  // and signal the global audit log to refetch too.
+  const handleChanged = useCallback(async () => {
+    await loadTasks();
+    setRefreshKey((k) => k + 1);
+  }, [loadTasks]);
 
   useEffect(() => {
     async function init() {
@@ -44,7 +54,7 @@ export default function App() {
         <p className="subtitle">Create tasks, advance their status, and review who changed what.</p>
       </header>
 
-      <CreateTaskForm onCreated={loadTasks} />
+      <CreateTaskForm onCreated={handleChanged} />
 
       {error && <div className="banner banner-error">{error}</div>}
 
@@ -55,10 +65,12 @@ export default function App() {
       ) : (
         <ul className="task-list">
           {tasks.map((task) => (
-            <TaskItem key={task.id} task={task} users={users} onChanged={loadTasks} />
+            <TaskItem key={task.id} task={task} users={users} onChanged={handleChanged} />
           ))}
         </ul>
       )}
+
+      <GlobalAuditLog activeTaskIds={tasks.map((t) => t.id)} refreshKey={refreshKey} />
     </div>
   );
 }

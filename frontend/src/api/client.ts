@@ -53,3 +53,9 @@ export async function fetchAuditLogs(taskId: string): Promise<AuditLog[]> {
   const res = await fetch(`${API_BASE}/tasks/${taskId}/audit-logs`);
   return handleResponse<AuditLog[]>(res);
 }
+
+// Global audit log across all tasks, including tasks that have been deleted.
+export async function fetchAllAuditLogs(): Promise<AuditLog[]> {
+  const res = await fetch(`${API_BASE}/audit-logs`);
+  return handleResponse<AuditLog[]>(res);
+}

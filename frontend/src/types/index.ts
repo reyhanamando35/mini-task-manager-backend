@@ -14,6 +14,7 @@ export interface Task {
 export interface AuditLog {
   id: string;
   taskId: string;
+  taskTitle: string; // snapshot judul task saat perubahan, lihat backend/src/types
   actor: string;
   fromStatus: TaskStatus;
   toStatus: TaskStatus;

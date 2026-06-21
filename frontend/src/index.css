@@ -223,3 +223,28 @@ select {
   font-size: 0.82rem;
   color: var(--color-text-muted);
 }
+
+.global-audit {
+  margin-top: 32px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.global-audit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.global-audit-header h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.deleted-tag {
+  color: var(--color-danger);
+  font-style: italic;
+}
