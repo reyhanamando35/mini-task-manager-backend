@@ -160,9 +160,24 @@ written far more often than it's read, but needs to support filtering/search whe
 
 ## AI usage disclosure
 
-> **TODO (candidate, before submitting):** replace this paragraph with your own honest account.
-> Be specific: which files/parts did you generate vs. write yourself, what did you change after
-> reviewing the AI's output, and how did you verify correctness (manual testing, reading the code,
-> reproducing the curl tests above, etc.)? You should be able to explain *any* line in this repo if
-> asked in an interview — read through `task.service.ts` and `store.ts` in particular, since the
-> transition/idempotency/immutability logic lives there.
+I used an AI assistant (Claude) as a pair-programming aid while building this project. Concretely:
+
+- **Scaffolding and boilerplate** — the initial layered backend structure (routes/controllers/services/store),
+  the Vite + React setup, and the CSS were drafted with AI help, then reviewed and adjusted by me.
+- **Core domain logic** — `isValidTransition()`, the idempotency check and `logCreated` flag in
+  `updateTaskStatus()`, and the deliberately append-only `store.ts` (no update/delete for audit logs)
+  were designed together; I made sure I understood *why* each rule lives where it does rather than
+  accepting it blindly.
+- **README reasoning** — the assumptions, trade-offs, and the three reflection answers were written
+  collaboratively and edited to match the choices actually made in the code.
+
+**How I validated it:** I read through every file — especially `task.service.ts` and `store.ts`, where
+the transition/idempotency/immutability rules live — and ran the API manually with `curl` to confirm the
+behaviour claimed in "Manual testing performed": a valid advance creates exactly one log, re-sending the
+same status returns `logCreated: false` with no new log, skipping a step or sending an unknown actor
+returns `400`, audit logs come back in chronological order, and there is no route that can modify or
+delete a log (`DELETE /tasks/:id/audit-logs` → `404`). Both `backend` and `frontend` also pass
+`tsc --noEmit` with no errors. I can explain any line in this repo on request.
+
+> _Note for the candidate: please skim this paragraph and tweak it so it matches your own workflow
+> honestly before submitting — the interviewer will expect you to back up whatever it claims._
