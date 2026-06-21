@@ -1,7 +1,7 @@
 # Mini Task Manager
 
 A small internal tool for creating tasks, moving them through a fixed status workflow, and reviewing
-a tamper-proof audit trail of every status change — built for the "Full Stack Developer (React +
+a tamper-proof audit trail of every status change, built for the "Full Stack Developer (React +
 Express)" take-home assessment.
 
 ## Tech stack
